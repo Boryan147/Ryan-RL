@@ -1,0 +1,28 @@
+# Environment settings
+env:
+  name: 'CartPole-v1'
+  max_steps: 500
+
+# Neural network architecture
+network:
+  hidden_size = 128
+ 
+# RL hyperparameters
+hyperparameters:
+  lr: 3e-4
+  gamma: 0.99
+  tau: 0.005
+  buffer_capacity: 10000
+  batch_size: 128
+
+# Exploration parameters (epsilon greedy)
+exploration:
+  max_epsilon: 0.9
+  min_epsilon: 0.01
+  decay_rate: 2500
+
+# training parameters
+training:
+  n_episode: 600
+  seed: 42
+  save_dir: './checkpoints'
