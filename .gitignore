@@ -1,2 +1,40 @@
-venv/
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Python & Virtual Environments
 __pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+.conda/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# RL & Deep Learning Artifacts
+# Ignore raw training logs, tensorboard data, and saved model weights
+runs/
+logs/
+checkpoints/
+*.pt
+*.pth
+*.pkl
+*.h5
+
+# Gym/Gymnasium video recorder dumps
+videos/
+
+# Dataset or replay buffer external storages if they get large
+data/
