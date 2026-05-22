@@ -8,7 +8,9 @@ This directory contains a highly modular, readable, and reproducible PyTorch imp
 
 DQN is a model-free, off-policy, value-based reinforcement learning algorithm designed for discrete action spaces. It combines reinforcement learning with deep neural networks to approximate the optimal action-value function:
 
-$$Q^*(s, a) = \max_{\pi} \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t R_t \;\middle|\; S_0 = s, A_0 = a \right]$$
+$$
+Q^*(s, a) = \max_{\pi} \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t R_t \;\middle|\; S_0 = s, A_0 = a \right]
+$$
 
 ### ⚡ Key Algorithmic Features in This Implementation
 
@@ -17,19 +19,29 @@ $$Q^*(s, a) = \max_{\pi} \mathbb{E} \left[ \sum_{t=0}^{\infty} \gamma^t R_t \;\m
 
 2. **Polyak Soft Target Updates ($\tau$):**
    Instead of copying the policy network weights to the target network periodically, we perform a smooth update on every training step:
-   $$\theta_{\text{target}} \leftarrow \tau \theta_{\text{policy}} + (1 - \tau) \theta_{\text{target}}$$
+
+$$
+\theta_{\text{target}} \leftarrow \tau \theta_{\text{policy}} + (1 - \tau) \theta_{\text{target}}
+$$
+
    where $\tau = 0.005$. This provides extremely stable target values $Y_t$ and prevents Q-value estimation oscillations.
 
 3. **Huber Loss (Smooth L1 Loss):**
    Robust regression loss function that behaves quadratically for small errors and linearly for large errors. This prevents gradient explosion caused by large TD-errors early in training:
-   $$L_\delta(a) = \begin{cases} \frac{1}{2}a^2 & \text{for } |a| \le \delta, \\ \delta(|a| - \frac{1}{2}\delta) & \text{otherwise.} \end{cases}$$
+
+$$
+L_\delta(a) = \begin{cases} \frac{1}{2}a^2 & \text{for } |a| \le \delta, \\ \delta(|a| - \frac{1}{2}\delta) & \text{otherwise.} \end{cases}
+$$
 
 4. **AMSGrad AdamW Optimizer:**
    Uses modern weight decay parameters alongside the `AMSGrad` variant of Adam to ensure bounded learning rates and steady weight convergence.
 
 5. **Exponential Epsilon-Greedy Decay:**
    Encourages broad exploration during the initial steps, systematically decaying to exploitation as training steps scale:
-   $$\epsilon = \epsilon_{\text{min}} + (\epsilon_{\text{max}} - \epsilon_{\text{min}}) \cdot e^{-\frac{\text{steps}}{\text{decay\_rate}}}$$
+
+$$
+\epsilon = \epsilon_{\text{min}} + (\epsilon_{\text{max}} - \epsilon_{\text{min}}) \cdot e^{-\frac{\text{steps}}{\text{decay\_rate}}}
+$$
 
 ---
 
