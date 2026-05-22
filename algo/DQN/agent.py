@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from .model import DQN
 from utils.buffers import Replaybuffer
+from utils.schedules import EpsilonGreedy
 
 class DQNAgent:
     def __init__(self, state_size, action_size, config):
@@ -22,18 +23,25 @@ class DQNAgent:
         self.target_net = DQN(state_size, config['hidden_size'], action_size).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=config['lr'])
+        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=config['lr'], amsgrad=True)
         self.memory = Replaybuffer(config['buffer_capacity'])
         self.steps_done = 0
 
-    def select_action(self, state, epsilon):
+    def select_action(self, state):
+        self.epsilon_greedy = EpsilonGreedy(
+            max_epsilon=self.config['max_epsilon'],
+            min_epsilon=self.config['min_epsilon'],
+            decay_rate=self.config['decay_rate']
+        )
         sample = random.random()
-        if sample > epsilon:
+        epsilon_threshold = self.epsilon_greedy.get_epsilon(self.steps_done)
+        self.steps_done += 1
+        if sample > epsilon_threshold:
             with torch.no_grad():
                 # state shape = [1, state_size]
-                return self.policy_net(state).max(1).indices.view(1,1)
+                return self.policy_net(state).max(1).indices.view(1,1).to(self.device)
         else:
-            return torch.tensor([[random.randint(0, self.action_size - 1)]])
+            return torch.tensor([[random.randint(0, self.action_size - 1)]]).to(self.device)
     
     def optimize_model(self):
         if len(self.memory) < self.config['batch_size']:

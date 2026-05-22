@@ -6,7 +6,8 @@ class EpsilonGreedy:
         self.min_epsilon = min_epsilon
         self.decay_rate = decay_rate
 
-    def epsilon_decay(self, steps_done):
+    def get_epsilon(self, steps_done):
+        # exponential decay of epsilon
         return self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(-1.0 * steps_done / self.decay_rate)
 
         
