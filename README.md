@@ -56,7 +56,7 @@ Below is a summary of the algorithms implemented or planned in this repository:
 | Algorithm | Family | Action Space | Status | Documentation & Results |
 | :--- | :--- | :--- | :--- | :--- |
 | **DQN (Deep Q-Network)** | Value-based | Discrete | 🟢 Implemented | [DQN Deep Dive & Performance](algo/DQN/README.md) |
-| **Double DQN (DDQN)** | Value-based | Discrete | 🟡 Planned | *Coming Soon* |
+| **Double DQN (DDQN)** | Value-based | Discrete | 🟢 Implemented | [DDQN Deep Dive & Noisy Benchmarks](algo/DQN/Double_DQN/README.md) |
 | **REINFORCE** | Policy Gradient | Discrete / Continuous | 🟡 Planned | *Coming Soon* |
 | **PPO (Proximal Policy)** | Actor-Critic | Discrete / Continuous | 🟡 Planned | *Coming Soon* |
 | **SAC (Soft Actor-Critic)** | Actor-Critic (Max Ent) | Continuous | 🟡 Planned | *Coming Soon* |
