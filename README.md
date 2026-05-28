@@ -1,21 +1,15 @@
-# 🚀 Ryan-RL: A Personal Reinforcement Learning Laboratory
+# Ryan-RL: A Personal Reinforcement Learning Laboratory
 
-Welcome to **Ryan-RL**, a clean, modular, and highly structured repository built from scratch to study, implement, and compare Reinforcement Learning (RL) algorithms.
+Welcome to **Ryan-RL**, a clean, modular, and highly structured repository built from scratch to study, implement, and compare Reinforcement Learning (RL) algorithms. 
 
----
 
-## 🎯 Repository Purpose
+## Repository Purpose
 
-The primary goal of this repository is to **master Reinforcement Learning from the ground up**. Rather than relying on high-level, black-box libraries (e.g. Stable-Baselines3), this repository focuses on writing readable, production-grade PyTorch implementations of classic and modern RL agents. 
+The primary goal of this repository is to help me **master Reinforcement Learning from the ground up**. Rather than relying on high-level, black-box libraries (e.g. Stable-Baselines3), this repository focuses on writing readable and reproducible PyTorch implementations of classic and modern RL agents. 
 
-This codebase serves as a framework to:
-* **Deeply Understand Math-to-Code Translation:** Implement core reinforcement learning algorithms directly from their mathematical formulations and papers.
-* **Explore Hyperparameter Sensitivity:** Analyze how discount factors ($\gamma$), soft target updates ($\tau$), schedules, and buffer sizes affect convergence and training stability.
-* **Standardize Benchmarking:** Maintain a modular pipeline to easily compare different families of algorithms (Value-based, Policy Gradient, Actor-Critic) under identical conditions.
+Moreover, I hope this repo can be a reference for beginners who want to learn Rl algorithms with hands-on experience.
 
----
-
-## 🗺️ Big Picture & Architecture
+## Big Picture & Architecture
 
 The repository is built around a highly modular design pattern. Every algorithm uses the same structural conventions, allowing components (like replay buffers, schedulers, and network layers) to be easily swapped.
 
@@ -23,12 +17,12 @@ The repository is built around a highly modular design pattern. Every algorithm 
 Ryan-RL/
 ├── 📂 algo/                  # RL Agent Implementations
 │   └── 📂 DQN/                # Deep Q-Network Agent & deep dive
-│       ├── README.md         # 📖 DQN mathematical details, configurations, & results
+│       ├── README.md         # DQN mathematical details, configurations, & results
 │       ├── agent.py          # Action-selection, experience collection, & SGD updates
-│       └── model.py          # Q-network architecture (PyTorch MLP)
+│       └── model.py          # Q-network architecture
 ├── 📂 configs/               # YAML configurations for reproducible experiments
 ├── 📂 utils/                 # Modular, reusable helper components
-│   ├── buffers.py            # Replay buffers (Off-Policy transitions)
+│   ├── buffers.py            # Replay buffers
 │   ├── schedules.py          # Exploration / Parameter schedulers
 │   └── visuals.py            # Real-time training curve visualizer
 ├── 📂 results/               # Saved weights, logs, training plots, and demo GIFs
@@ -37,21 +31,9 @@ Ryan-RL/
 └── environment.yml           # Conda package specifications
 ```
 
-### 🔍 Detailed Module Functions
+## Algorithm Implementation Index
 
-| Module Component | Location | Role & Responsibility |
-| :--- | :--- | :--- |
-| **Algorithms (`algo/`)** | `algo/<algorithm_name>/` | Houses specific RL agent logic. It is completely isolated per algorithm, containing the mathematical state updates, target net coordination, and PyTorch model architectures. |
-| **Configurations (`configs/`)** | `configs/<config_name>.yaml` | Decouples hyperparameters from code. Controls environmental setup, network sizes, exploration rates, and seeds to guarantee 100% reproducibility. |
-| **Utilities (`utils/`)** | `utils/` | Reusable utilities shared across multiple agents. Includes memory structures (buffers), learning schedules, and plotting tools. |
-| **Training Pipeline** | `train.py` | The main execution entry point. Parses configuration files, instantiates environments, runs the interaction loops, and triggers agent updates. |
-| **Evaluation Pipeline** | `eval.py` | Loads trained models, runs deterministic inference, calculates performance metrics, and renders a `.gif` video showing the agent's behavior. |
-
----
-
-## 📊 Algorithm Implementation Index
-
-Below is a summary of the algorithms implemented or planned in this repository:
+Below is a summary of the algorithms I've implemented or planned in this repository:
 
 | Algorithm | Family | Action Space | Status | Documentation & Results |
 | :--- | :--- | :--- | :--- | :--- |
@@ -91,12 +73,3 @@ Evaluate your trained agents and render play-through demonstrations:
 # Runs evaluation and saves a play-through GIF to the results folder
 python eval.py
 ```
-
----
-
-## 🎯 Future Comparative Benchmark Plans
-
-Once multiple algorithms are implemented, a unified comparative suite will be developed to evaluate:
-1. **Sample Efficiency:** Total environment steps required to reach target reward limits.
-2. **Algorithmic Stability:** Variance in rewards across different random seed initializations.
-3. **Wall-clock Speed:** Training time comparison between on-policy and off-policy algorithms.
