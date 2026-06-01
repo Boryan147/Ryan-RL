@@ -3,11 +3,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .model import DQN
+from algo.DQN.Dueling_DQN.dueling_net import Dueling_DQN
 from utils.buffers import Replaybuffer
 from utils.schedules import EpsilonGreedy
 
-class DQNAgent:
+class Dueling_DQNAgent:
     def __init__(self, state_size, action_size, config):
         self.state_size = state_size
         self.action_size = action_size
@@ -19,8 +19,8 @@ class DQNAgent:
         )
 
         # Networks
-        self.policy_net = DQN(state_size, config['hidden_size'], action_size).to(self.device)
-        self.target_net = DQN(state_size, config['hidden_size'], action_size).to(self.device)
+        self.policy_net = Dueling_DQN(state_size, config['hidden_size'], action_size).to(self.device)
+        self.target_net = Dueling_DQN(state_size, config['hidden_size'], action_size).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=config['lr'], amsgrad=True)
@@ -59,9 +59,12 @@ class DQNAgent:
 
         # Q(s_t, a)
         Q_values = self.policy_net(state_batch).gather(1, action_batch)
-        # maxQ(s_t+1, a')
+        # decouple action selection & evaluation in next_state
         with torch.no_grad():
-            Q_target = self.target_net(next_state_batch).max(1).values
+            # select max action by policy_net
+            next_max_action = self.policy_net(next_state_batch).max(1).indices.unsqueeze(1)
+            # evaluate the Q-value by target_net
+            Q_target = self.target_net(next_state_batch).gather(1, next_max_action).squeeze(1)
         # TD target
         TD_target = reward_batch + self.config['gamma'] * Q_target * (~done_batch)
         
