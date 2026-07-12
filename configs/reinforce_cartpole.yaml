@@ -1,0 +1,17 @@
+env:
+  name: "CartPole-v1"
+
+network:
+  hidden_size: 128
+  baseline_hidden_size: 128 
+
+hyperparameters:
+  gamma: 0.99
+  lr_actor: 0.001
+  lr_critic: 0.005
+
+training:
+  seed: 42
+  num_episodes: 800
+  num_steps: 500
+  save_dir: "results/reinforce_cartpole"
