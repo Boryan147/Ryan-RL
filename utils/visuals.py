@@ -12,7 +12,7 @@ def plot_learning_curve(episode_durations, save_dir, filename):
     plt.figure(figsize=(10, 5))
     plt.title("Training Progress")
     plt.xlabel("Episode")
-    plt.ylabel("Duration / Reward")
+    plt.ylabel("Reward")
     
     # Plot raw data
     durations = np.array(episode_durations)

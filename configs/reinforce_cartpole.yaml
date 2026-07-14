@@ -12,6 +12,6 @@ hyperparameters:
 
 training:
   seed: 42
-  num_episodes: 800
+  n_episode: 800
   num_steps: 500
-  save_dir: "results/reinforce_cartpole"
+  save_dir: "./results/reinforce_cartpole"
