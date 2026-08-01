@@ -4,9 +4,13 @@ from distutils.util import strtobool
 import random
 import numpy as np
 import time
-import torch
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.distributions.categorical import Categorical
 
 
 def parse_args():
@@ -28,7 +32,9 @@ def parse_args():
     
     # Algorithm related arguments
     parser.add_argument('--num-envs', type=int, default=4, help='the number of environments in parallel')
+    parser.add_argument('--num-steps', type=int, default=128, help='the number of steps the agent takes for rollout data')
     args = parser.parse_args()
+    args.batch_size = int(args.num_steps * args.num_envs)
     return args
 
 def make_env(gym_id, seed, idx, capture_video, run_name):
@@ -43,6 +49,39 @@ def make_env(gym_id, seed, idx, capture_video, run_name):
             env.observation_space.seed(seed)
             return env
         return init_env
+
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    nn.init.orthogonal_(layer.weight, std)
+    nn.init.constant_(layer.bias, bias_const)
+    return layer
+     
+class Agent(nn.Module):
+    def __init__(self, envs):
+        super().__init__()
+        self.actor = nn.Sequential(
+            layer_init(nn.Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01)
+        )
+        self.critic = nn.Sequential(
+            layer_init(nn.linear(np.array(envs.single_observation_space.shape).prod()), 64),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 1), std=1.0)
+        )
+
+    def get_value(self, x):
+        return self.critic(x)
+
+    def get_action_and_value(self, x, action=None):
+        logits = self.actor(x)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
 
 if __name__ == "__main__":
     args = parse_args()
@@ -61,3 +100,22 @@ if __name__ == "__main__":
     envs = gym.vector.SyncVectorEnv([make_env(args.gym_id, args.seed + i, i, args.capture_video, run_name) 
             for i in range(args.num_envs)])
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), 'only discrete action space is allowed'
+    print('envs.single_observation_space.shape', envs.single_observation_space.shape)
+    print('envs.single_action_space.n', envs.single_action_space.n)
+
+    agent = Agent(envs).to(device)
+    optimizer = optim.Adam(agent.parameters(), lr=args.lr, eps=1e-5)
+
+    # ALGO Logic: Storage setup(rollout buffer)
+    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
+    actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
+    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
+
+    global_step = 0
+    start_time = time.time()
+    next_obs = torch.Tensor(envs.reset()).to(device) # initial observation
+    next_done = torch.zeros(args.num_envs).to(device)
+    num_updats = args.timesteps // args.batch_size
