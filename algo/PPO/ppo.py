@@ -12,7 +12,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
 
-
 def parse_args():
     '''set up some common arguments'''
     parser = argparse.ArgumentParser()
@@ -33,6 +32,8 @@ def parse_args():
     # Algorithm related arguments
     parser.add_argument('--num-envs', type=int, default=4, help='the number of environments in parallel')
     parser.add_argument('--num-steps', type=int, default=128, help='the number of steps the agent takes for rollout data')
+    parser.add_argument('--anneal-lr', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True,
+        help='Toggle learning rate annealing for policy and value networks')
     args = parser.parse_args()
     args.batch_size = int(args.num_steps * args.num_envs)
     return args
@@ -76,7 +77,7 @@ class Agent(nn.Module):
     def get_value(self, x):
         return self.critic(x)
 
-    def get_action_and_value(self, x, action=None):
+    def get_action_and_value(self, x, action=None): # action ???
         logits = self.actor(x)
         probs = Categorical(logits=logits)
         if action is None:
@@ -116,6 +117,53 @@ if __name__ == "__main__":
 
     global_step = 0
     start_time = time.time()
-    next_obs = torch.Tensor(envs.reset()).to(device) # initial observation
+    next_obs, _ = torch.Tensor(envs.reset()).to(device) # initial observation
     next_done = torch.zeros(args.num_envs).to(device)
-    num_updats = args.timesteps // args.batch_size
+    num_updates = args.timesteps // args.batch_size
+
+    for update in range(1, num_updates + 1):
+        # anneal learning rate
+        if args.anneal_lr:
+            frac = 1.0 - (update - 1.0) / num_updates
+            lr_now = frac * args.lr
+            optimizer.param_groups[0]['lr'] = lr_now
+
+        for step in range(0, args.num_steps):
+            global_step += 1 * args.num_envs
+            obs[step] = next_obs
+            dones[step] = next_done
+
+            # ALGO: action logic
+            with torch.no_grad():
+                action, logprob, _, value = agent.get_action_and_value(next_obs)
+                value[step] = value.flatten()
+            actions[step] = action
+            logprobs[step] = logprob
+
+            # run the env and log data
+            next_obs, reward, terminated, truncated, infos = envs.step(action.cpu().numpy())
+            done = terminated or truncated
+            rewards[step] = torch.tensor(reward).to(device).view(-1) # why view
+            next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(done).to(device) # Tensor???
+
+            # for item in info:
+            #     if "episode" in item.keys():
+            #         print(f"global_step={global_step}, episodic_return={item['episode']['r']}")
+            #         writer.add_scalar("charts/episodic_return", item["episode"]["r"], global_step)
+            #         writer.add_scalar("charts/episodic_length", item["episode"]["l"], global_step)
+            #         break
+            
+            # modification for new version of gymnasium
+            if 'episode' in infos:
+                for idx in range(args.num_envs):
+                    if infos['_episode'][idx]:
+                        print(f"global_step={global_step}, env {idx} finished, episodic_return={infos['episode']['r'][idx]}")
+                        writer.add_scalar('episodic_return', infos['episode']['r'][idx], global_step)
+                        writer.add_scalar('episodic_length', infos['episode']['l'][idx], global_step)
+
+
+
+
+
+
+
