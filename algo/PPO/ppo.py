@@ -34,8 +34,15 @@ def parse_args():
     parser.add_argument('--num-steps', type=int, default=128, help='the number of steps the agent takes for rollout data')
     parser.add_argument('--anneal-lr', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True,
         help='Toggle learning rate annealing for policy and value networks')
+    parser.add_argument('--gae', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True,
+        help='GAE for advantage estimation')
+    parser.add_argument('--gamma', type=float, default=0.99, help='the discount factor gamma')
+    parser.add_argument('--gae-lambda', type=float, default=0.95, help='lambda for GAE')
+    parser.add_argument('--num-minibatches', type=int, default=4, help='the number of mini-batches')
+    parser.add_argument('--epoches', type=int, default=4, help='the K epoches to update the policy')
     args = parser.parse_args()
     args.batch_size = int(args.num_steps * args.num_envs)
+    args.mini_batch_size = int(args.batch_size // args.num_minibatches)
     return args
 
 def make_env(gym_id, seed, idx, capture_video, run_name):
@@ -117,7 +124,7 @@ if __name__ == "__main__":
 
     global_step = 0
     start_time = time.time()
-    next_obs, _ = torch.Tensor(envs.reset()).to(device) # initial observation
+    next_obs, _ = torch.Tensor(envs.reset()).to(device) # initial observation ???
     next_done = torch.zeros(args.num_envs).to(device)
     num_updates = args.timesteps // args.batch_size
 
@@ -152,7 +159,7 @@ if __name__ == "__main__":
             #         writer.add_scalar("charts/episodic_return", item["episode"]["r"], global_step)
             #         writer.add_scalar("charts/episodic_length", item["episode"]["l"], global_step)
             #         break
-            
+
             # modification for new version of gymnasium
             if 'episode' in infos:
                 for idx in range(args.num_envs):
@@ -160,6 +167,60 @@ if __name__ == "__main__":
                         print(f"global_step={global_step}, env {idx} finished, episodic_return={infos['episode']['r'][idx]}")
                         writer.add_scalar('episodic_return', infos['episode']['r'][idx], global_step)
                         writer.add_scalar('episodic_length', infos['episode']['l'][idx], global_step)
+
+        with torch.no_grad():
+            next_value = agent.get_value(next_obs).reshape(1, -1)
+            if args.gae:
+                advantages = torch.zeros_like(rewards).to(device)
+                lastgaelam = 0
+                for t in reversed(range(args.num_steps)):
+                    if t == args.num_steps - 1:
+                        nextnonterminal = 1.0 - next_done
+                        nextvalues = next_value
+                    else:
+                        nextnonterminal = 1.0 - dones[t + 1]
+                        nextvalues = values[t + 1]
+                    delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+                    advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                returns = advantages + values
+            else:
+                returns = torch.zeros_like(rewards).to(device)
+                for t in reversed(range(args.num_steps)):
+                    if t == args.num_steps - 1:
+                        nextnonterminal = 1.0 - next_done
+                        next_return = next_value
+                    else:
+                        nextnonterminal = 1.0 - dones[t + 1]
+                        next_return = returns[t + 1]
+                    returns[t] = rewards[t] + args.gamma * next_return * nextnonterminal
+                advantages = returns - values
+
+        # flatten the batch
+        b_obs = obs.reshape((-1, envs.single_observation_space.shape))
+        b_actions = actions.reshape((-1, envs.single_action_space.shape))
+        b_logprobs = logprobs.reshape(-1)
+        b_advantages = advantages.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_values = values.reshape(-1)
+
+        # optimizing policy and value networks 
+        b_inds = np.arange(args.batch_size)
+        for epoch in range(args.epoches):
+            np.random.shuffle(b_inds)
+            for start in range(0, args.batch_size, args.mini_batch_size):
+                end = start + args.mini_batch_size
+                mb_inds = b_inds[start:end]
+
+                _, newlogprob, entropy, new_values = agent.get_action_and_value(
+                    b_obs[mb_inds], b_actions.long()[mb_inds]
+                )
+                logratio = newlogprob - b_logprobs[mb_inds]
+                ratio = logratio.exp() ## don't understand
+
+                mb_advantages = b_advantages[mb_inds]
+                
+
+            
 
 
 
