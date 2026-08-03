@@ -11,37 +11,30 @@ Moreover, I hope this repo can be a reference for beginners who want to learn Rl
 
 ## Big Picture & Architecture
 
-The repository is built around a highly modular design pattern. Every algorithm uses the same structural conventions, allowing components (like replay buffers, schedulers, and network layers) to be easily swapped.
+The repository is built around a clean, modular design. Algorithms are housed in self-contained folders within `algo/`, while shared utilities reside in `utils/`:
 
 ```
 Ryan-RL/
-├── 📂 algo/                  # RL Agent Implementations
-│   └── 📂 DQN/                # Deep Q-Network Agent & deep dive
-│       ├── README.md         # DQN mathematical details, configurations, & results
-│       ├── agent.py          # Action-selection, experience collection, & SGD updates
-│       └── model.py          # Q-network architecture
-├── 📂 configs/               # YAML configurations for reproducible experiments
-├── 📂 utils/                 # Modular, reusable helper components
-│   ├── buffers.py            # Replay buffers
-│   ├── schedules.py          # Exploration / Parameter schedulers
-│   └── visuals.py            # Real-time training curve visualizer
-├── 📂 results/               # Saved weights, logs, training plots, and demo GIFs
-├── train.py                  # Standardized training pipeline entry-point
-├── eval.py                   # Standardized evaluation & GIF generation entry-point
-└── environment.yml           # Conda package specifications
+├── algo/        # RL agent implementations (DQN, REINFORCE, A2C, PPO)
+├── configs/     # YAML configuration files for reproducible runs
+├── utils/       # Shared helpers (replay buffers, schedules, visualizers)
+├── results/     # Saved training weights, logs, and evaluation figures
+├── train.py     # Training execution script
+└── eval.py      # Trained agent evaluation and rendering
 ```
 
 ## Algorithm Implementation Index
 
-Below is a summary of the algorithms I've implemented or planned in this repository:
+Below is a summary of the reinforcement learning algorithms implemented in this repository:
 
-| Algorithm | Family | Action Space | Status | Documentation & Results |
-| :--- | :--- | :--- | :--- | :--- |
-| **DQN (Deep Q-Network)** | Value-based | Discrete | 🟢 Implemented | [DQN Deep Dive & Performance](algo/DQN/README.md) |
-| **Double DQN (DDQN)** | Value-based | Discrete | 🟢 Implemented | [DDQN Deep Dive & Noisy Benchmarks](algo/DQN/Double_DQN/README.md) |
-| **REINFORCE** | Policy Gradient | Discrete / Continuous | 🟡 Planned | *Coming Soon* |
-| **PPO (Proximal Policy)** | Actor-Critic | Discrete / Continuous | 🟡 Planned | *Coming Soon* |
-| **SAC (Soft Actor-Critic)** | Actor-Critic (Max Ent) | Continuous | 🟡 Planned | *Coming Soon* |
+| Algorithm | Family | Action Space | Implementation & Documentation |
+| :--- | :--- | :--- | :--- |
+| **DQN (Deep Q-Network)** | Value-based | Discrete | [DQN Deep Dive & Performance](algo/DQN/README.md) |
+| **Double DQN (DDQN)** | Value-based | Discrete | [DDQN Deep Dive & Noisy Benchmarks](algo/DQN/Double_DQN/README.md) |
+| **Dueling DQN** | Value-based | Discrete | [Dueling DQN Implementation](algo/DQN/Dueling_DQN/) |
+| **REINFORCE** | Policy Gradient | Discrete | [REINFORCE Agent](algo/REINFORCE/agent.py) |
+| **A2C (Advantage Actor-Critic)** | Actor-Critic | Discrete | [A2C Notebooks (Online, n-step, GAE)](algo/A2C/) |
+| **PPO (Proximal Policy Optimization)** | Actor-Critic | Discrete | [PPO Code](algo/PPO/ppo.py) |
 
 ---
 
