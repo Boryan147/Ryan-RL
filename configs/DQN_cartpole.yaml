@@ -6,7 +6,7 @@ env:
 # Neural network architecture
 network:
   hidden_size: 128
- 
+
 # RL hyperparameters
 hyperparameters:
   lr: 3.0e-4
