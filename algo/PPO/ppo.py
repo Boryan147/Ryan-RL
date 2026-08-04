@@ -62,7 +62,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     nn.init.orthogonal_(layer.weight, std)
     nn.init.constant_(layer.bias, bias_const)
     return layer
-     
+
 class Agent(nn.Module):
     def __init__(self, envs):
         super().__init__()
@@ -93,7 +93,7 @@ class Agent(nn.Module):
 
 if __name__ == "__main__":
     args = parse_args()
-    run_name = f'{args.gym_id}__{args.exp_name}__{args.seed}__{args.int(time.time())}'
+    run_name = f'{args.gym_id}__{args.exp_name}__{args.seed}__{int(time.time())}'
     writer = SummaryWriter(f'runs/{run_name}')
 
     # set the seed

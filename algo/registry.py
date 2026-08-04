@@ -14,5 +14,5 @@ Agent_Registry = {
 # instantiate agent
 def make_agent(algo, obs_size, act_size, config):
     if algo not in Agent_Registry:
-        print(f'Algorithm {algo} not found. Choose from {list(Agent_Registry.keys())}')
+        raise ValueError(f'Algorithm {algo} not found. Choose from {list(Agent_Registry.keys())}')
     return Agent_Registry[algo](obs_size, act_size, config)

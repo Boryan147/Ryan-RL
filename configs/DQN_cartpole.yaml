@@ -1,3 +1,6 @@
+# Algo selection
+algo: 'DQN'
+
 # Environment settings
 env:
   name: 'CartPole-v1'
@@ -23,6 +26,6 @@ exploration:
 
 # training parameters
 training:
-  n_episode: 1200
+  n_episode: 800
   seed: 42
   save_dir: './results/DQN_cartpole'
