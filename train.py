@@ -25,9 +25,6 @@ def train(config_path):
     # Load Configurations
     config = load_config(config_path)
     env_cfg = config['env']
-    net_cfg = config['network']
-    hp_cfg = config['hyperparameters']
-    exp_cfg = config['exploration']
     train_cfg = config['training']
     algo = config['algo']
     
@@ -38,12 +35,20 @@ def train(config_path):
     env = gym.make(env_cfg['name'])
     env = gym.wrappers.RecordEpisodeStatistics(env)
     
+    # merge all yaml sections into a single config dictionary
+    agent_config = {}
+    for key, value in config.items():
+        if isinstance(value, dict):
+            agent_config.update(value)
+        else:
+            agent_config[key] = value
+
     # Instantiate Agent 
-    agent = make_agent(
+    agent = make_agent( 
         algo,
         env.observation_space.shape[0],
         env.action_space.n,
-        config={**net_cfg, **hp_cfg, **exp_cfg, **train_cfg}
+        config=agent_config
     )
 
     # setup tensorboard logger
