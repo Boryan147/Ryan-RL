@@ -69,12 +69,15 @@ class DQNAgent:
         criterion = nn.SmoothL1Loss()
         loss = criterion(Q_values, TD_target.unsqueeze(1))
 
+        # calculate mean Q-value
+        mean_q = Q_values.mean().item()
+
         # optimize the model
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
-        return loss.item()
+        return loss.item(), mean_q
 
     def update_target_network(self):
         # soft update
@@ -110,12 +113,13 @@ class DQNAgent:
                 obs = t_next_obs
 
                 # update the network
-                loss = self.optimize_model()
+                loss, q_val = self.optimize_model()
                 self.update_target_network()
 
                 # log data
                 if loss is not None and writer:
-                    writer.add_scalar('loss/train', loss, global_step)
+                    writer.add_scalar('losses/dqn_loss', loss, global_step)
+                    writer.add_scalar('charts/q_values', q_val, global_step)
 
                 if done:
                     if 'episode' in info:
