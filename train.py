@@ -94,12 +94,9 @@ def train(config_path):
     writer.close()
     
     if use_wandb:
-        try:
-            import wandb
-            if wandb.run:
-                wandb.finish()
-        except ImportError:
-            pass
+        import wandb
+        if wandb.run:
+            wandb.finish()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train an RL Agent")
