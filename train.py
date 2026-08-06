@@ -33,7 +33,8 @@ def train(config_path):
     wandb_project = logging_cfg["wandb_project"]
     record_video = logging_cfg["capture_video"]
     video_freq = logging_cfg["video_trigger"]
-    
+    group_name = logging_cfg['group']
+
     # Set reproducibility seeds
     set_seed(train_cfg['seed'])
 
@@ -74,14 +75,16 @@ def train(config_path):
     # Initialize Weights & Biases if tracking is enabled
     if use_wandb:
         import wandb
+
         wandb.init(
             project=wandb_project,
+            group=group_name,
             name=run_name,
             config=config,
             sync_tensorboard=True,               
             save_code=True,
         )
-        print(f"Weights & Biases tracking initialized for project: {wandb_project}")
+        print(f"Weights & Biases tracking initialized for project: {wandb_project} (group: {group_name})")
 
     # setup tensorboard logger
     writer = SummaryWriter(log_dir=log_dir)

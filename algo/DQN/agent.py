@@ -89,7 +89,10 @@ class DQNAgent:
         global_step = 0
 
         for episode in range(self.config['n_episode'] + 1):
-            obs, info = env.reset(seed=self.config['seed'] + episode)
+            if episode == 0:
+                obs, info = env.reset(seed=self.config['seed'])
+            else:
+                obs, info = env.reset()
             obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)  # obs shape: (1, T)
 
             while True:
