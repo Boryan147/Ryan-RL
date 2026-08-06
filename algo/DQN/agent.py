@@ -47,7 +47,7 @@ class DQNAgent:
     
     def optimize_model(self):
         if len(self.memory) < self.config['batch_size']:
-            return
+            return None, None
         # randomly select a batch
         batch = self.memory.sample(self.config['batch_size'])
         # extrach state, action, reward, next_state, done from batch
@@ -90,8 +90,10 @@ class DQNAgent:
     # agent training loop
     def learn(self, env, writer=None):
         global_step = 0
+        episode_reward = []
 
         for episode in range(self.config['n_episode'] + 1):
+        
             if episode == 0:
                 obs, info = env.reset(seed=self.config['seed'])
             else:
@@ -125,8 +127,13 @@ class DQNAgent:
                     if 'episode' in info:
                         epi_return = info['episode']['r']
                         epi_length = info['episode']['l']
+                        episode_reward.append(epi_return)
+
                         if writer:
                             writer.add_scalar('charts/episodic reward', epi_return, global_step)
                             writer.add_scalar('charts/episodic length', epi_length, global_step)
                     break
 
+            if episode % 50 == 0 and episode_reward:
+                avg_rew = np.mean(episode_reward[-50:])
+                print(f"Episode {episode:4d} | Last 50 Avg rewards: {avg_rew:6.2f}")
