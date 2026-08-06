@@ -29,3 +29,10 @@ training:
   n_episode: 800
   seed: 42
   save_dir: './results/DQN_cartpole'
+
+# Experiment tracking & video recording settings
+logging:
+  track: true           # Set to true to enable Weights & Biases tracking
+  wandb_project: 'Ryan-RL_DQN'
+  capture_video: true   # Set to true to record MP4 videos
+  video_trigger: 100     # Record video every N episodes
