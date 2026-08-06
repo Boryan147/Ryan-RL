@@ -33,8 +33,11 @@ checkpoints/
 *.pkl
 *.h5
 
-# Gym/Gymnasium video recorder dumps
+# Gymnasium video recorder dumps
 videos/
+
+# Weights & Biases
+wandb/
 
 # Dataset or replay buffer external storages if they get large
 data/
