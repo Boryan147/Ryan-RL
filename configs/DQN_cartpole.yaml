@@ -26,8 +26,8 @@ exploration:
 
 # training parameters
 training:
-  n_episode: 800
-  seed: 15 # run 5 times with different seeds 15, 16, 17, 18, 19
+  n_episode: 700
+  seed: 19 # run 5 times with different seeds 15, 16, 17, 18, 19
   save_dir: './results/DQN_cartpole'
 
 # Experiment tracking & video recording settings
@@ -35,5 +35,5 @@ logging:
   track: true           # Set to true to enable Weights & Biases tracking
   wandb_project: 'Ryan-RL'
   group: 'CartPole-v1_DQN' # group name for W&B multi-seed aggregation
-  capture_video: true   # Set to true to record MP4 videos
+  capture_video: false   # Set to true to record MP4 videos
   video_trigger: 100     # Record video every N episodes
