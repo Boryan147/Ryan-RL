@@ -8,7 +8,6 @@ import os
 
 from torch.utils.tensorboard import SummaryWriter
 from algo.registry import make_agent
-from utils.visuals import plot_learning_curve
 
 def load_config(config_path):
     with open(config_path, 'r') as file:
@@ -85,8 +84,7 @@ def train(config_path, track=False, wandb_project="Ryan-RL", capture_video=False
     print(f"Tensorboard logging to: {log_dir}")
 
     # train the agent
-    episode_rewards = agent.learn(env, writer=writer)
-    plot_learning_curve(episode_rewards, save_dir=train_cfg['save_dir'], filename="final_learning_curve.png")
+    agent.learn(env, writer=writer)
     
     env.close()
     writer.close()

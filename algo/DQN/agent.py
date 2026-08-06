@@ -86,7 +86,6 @@ class DQNAgent:
 
     # agent training loop
     def learn(self, env, writer=None):
-        episode_reward = []
         global_step = 0
 
         for episode in range(self.config['n_episode'] + 1):
@@ -119,14 +118,8 @@ class DQNAgent:
                     if 'episode' in info:
                         epi_return = info['episode']['r']
                         epi_length = info['episode']['l']
-                        episode_reward.append(epi_return)
                         if writer:
                             writer.add_scalar('charts/episodic reward', epi_return, global_step)
                             writer.add_scalar('charts/episodic length', epi_length, global_step)
                     break
-            if episode % 50 == 0 and episode_reward:
-                avg_rew = np.mean(episode_reward[-50:])
-                print(f"Episode {episode:4d} | Last 50 Avg rewards: {avg_rew:6.2f}")
-
-        return episode_reward
 
