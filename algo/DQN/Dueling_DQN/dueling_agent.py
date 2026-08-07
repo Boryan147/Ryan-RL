@@ -47,7 +47,7 @@ class Dueling_DQNAgent:
     
     def optimize_model(self):
         if len(self.memory) < self.config['batch_size']:
-            return
+            return None, None
         # randomly select a batch
         batch = self.memory.sample(self.config['batch_size'])
         # extrach state, action, reward, next_state, done from batch
@@ -72,11 +72,16 @@ class Dueling_DQNAgent:
         criterion = nn.SmoothL1Loss()
         loss = criterion(Q_values, TD_target.unsqueeze(1))
 
+        # calculate mean Q-value
+        mean_q = Q_values.mean().item()
+
         # optimize the model
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
+
+        return loss.item(), mean_q
 
     def update_target_network(self):
         # soft update
@@ -85,3 +90,54 @@ class Dueling_DQNAgent:
         for key in policy_net_state_dict:
             target_net_state_dict[key] = self.config['tau'] * policy_net_state_dict[key] + (1 - self.config['tau']) * target_net_state_dict[key]
         self.target_net.load_state_dict(target_net_state_dict)
+
+    # agent training loop
+    def learn(self, env, writer=None):
+        global_step = 0
+        episode_reward = []
+
+        for episode in range(self.config['n_episode'] + 1):
+        
+            if episode == 0:
+                obs, info = env.reset(seed=self.config['seed'])
+            else:
+                obs, info = env.reset()
+            obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)  # obs shape: (1, T)
+
+            while True:
+                global_step += 1
+                action = self.select_action(obs)
+                next_obs, reward, terminated, truncated, info = env.step(action.item())
+                done = terminated or truncated
+
+                # push transition to replay buffer
+                t_reward = torch.tensor([reward], device=self.device)
+                t_next_obs = torch.tensor(next_obs, dtype=torch.float32).unsqueeze(0).to(self.device)
+                t_done = torch.tensor([terminated], dtype=bool, device=self.device)
+
+                self.memory.push(obs, action, t_reward, t_next_obs, t_done)
+                obs = t_next_obs
+
+                # update the network
+                loss, q_val = self.optimize_model()
+                self.update_target_network()
+
+                # log data
+                if loss is not None and writer:
+                    writer.add_scalar('losses/dqn_loss', loss, global_step)
+                    writer.add_scalar('charts/q_values', q_val, global_step)
+
+                if done:
+                    if 'episode' in info:
+                        epi_return = info['episode']['r']
+                        epi_length = info['episode']['l']
+                        episode_reward.append(epi_return)
+
+                        if writer:
+                            writer.add_scalar('charts/episodic reward', epi_return, global_step)
+                            writer.add_scalar('charts/episodic length', epi_length, global_step)
+                    break
+
+            if episode % 50 == 0 and episode_reward:
+                avg_rew = np.mean(episode_reward[-50:])
+                print(f"Episode {episode:4d} | Last 50 Avg rewards: {avg_rew:6.2f}")
