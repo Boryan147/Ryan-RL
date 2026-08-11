@@ -88,22 +88,22 @@ class DQNAgent:
         self.target_net.load_state_dict(target_net_state_dict)
 
     # agent training loop
-    def learn(self, env, writer=None):
+    def learn(self, envs, writer=None):
         global_step = 0
         episode_reward = []
 
         for episode in range(self.config['n_episode'] + 1):
         
             if episode == 0:
-                obs, info = env.reset(seed=self.config['seed'])
+                obs, infos = envs.reset(seed=self.config['seed'])
             else:
-                obs, info = env.reset()
-            obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)  # obs shape: (1, T)
+                obs, infos = envs.reset()
+            obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)  # obs shape: (num_envs, obs_size)
 
             while True:
                 global_step += 1
                 action = self.select_action(obs)
-                next_obs, reward, terminated, truncated, info = env.step(action.item())
+                next_obs, reward, terminated, truncated, info = envs.step(action.item())
                 done = terminated or truncated
 
                 # push transition to replay buffer

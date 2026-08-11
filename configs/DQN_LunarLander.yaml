@@ -1,0 +1,39 @@
+# Algo selection
+algo: 'DQN'  # choose from DQN, DoubleDQN and DuelingDQN
+
+# Environment settings
+env:
+  name: 'LunarLander-v3'
+  num_envs: 4
+
+# Neural network architecture
+network:
+  hidden_size: 128
+
+# RL hyperparameters
+hyperparameters:
+  lr: 3.0e-4
+  gamma: 0.99
+  tau: 0.005
+  buffer_capacity: 10000
+  batch_size: 128
+
+# Exploration parameters (epsilon greedy)
+exploration:
+  max_epsilon: 0.9
+  min_epsilon: 0.01
+  decay_rate: 2000
+
+# training parameters
+training:
+  n_episode: 700
+  seed: 15 # run 5 times with different seeds 15, 16, 17, 18, 19
+  save_dir: './results/DQN_LunarLander'
+
+# Experiment tracking & video recording settings
+logging:
+  track: true           # Set to true to enable Weights & Biases tracking
+  wandb_project: 'Ryan-RL'
+  group: 'LunarLander_DQN' # group name for W&B multi-seed aggregation
+  # capture_video: false   # Set to true to record MP4 videos
+  # video_trigger: 100     # Record video every N episodes

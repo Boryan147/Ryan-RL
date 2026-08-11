@@ -7,6 +7,7 @@ import numpy as np
 import os
 
 from torch.utils.tensorboard import SummaryWriter
+from gymnasium.wrappers.vector import RecordEpisodeStatistics
 from algo.registry import make_agent
 
 def load_config(config_path):
@@ -23,38 +24,6 @@ def set_seed(seed):
 def train(config_path):
     # Load Configurations
     config = load_config(config_path)
-    env_cfg = config['env']
-    train_cfg = config['training']
-    logging_cfg = config['logging']
-    algo = config['algo']
-    
-    # Read tracking and video recording settings from YAML
-    use_wandb = logging_cfg['track']
-    wandb_project = logging_cfg["wandb_project"]
-    record_video = logging_cfg["capture_video"]
-    video_freq = logging_cfg["video_trigger"]
-    group_name = logging_cfg['group']
-
-    # Set reproducibility seeds
-    set_seed(train_cfg['seed'])
-
-    # Setup run name & logging paths
-    run_name = f"{env_cfg['name']}_{algo}_seed{train_cfg['seed']}"
-    log_dir = os.path.join(train_cfg['save_dir'], run_name)
-
-    # Initialize Environment
-    render_mode = "rgb_array" if record_video else None
-    env = gym.make(env_cfg['name'], render_mode=render_mode)
-    env = gym.wrappers.RecordEpisodeStatistics(env)
-    
-    if record_video:
-        video_dir = os.path.join(train_cfg['save_dir'], "videos", run_name)
-        env = gym.wrappers.RecordVideo(
-            env,
-            video_folder=video_dir,
-            episode_trigger=lambda ep_id: ep_id % video_freq == 0
-        )
-        print(f"Video recording enabled! Saving to: {video_dir} (every {video_freq} episodes)")
 
     # merge all yaml sections into a single config dictionary
     agent_config = {}
@@ -64,39 +33,55 @@ def train(config_path):
         else:
             agent_config[key] = value
 
+    # Set reproducibility seeds
+    set_seed(agent_config['seed'])
+
+    # Setup run name & logging paths
+    run_name = f"{agent_config['name']}_{agent_config['algo']}_seed{agent_config['seed']}"
+    log_dir = os.path.join(agent_config['save_dir'], run_name)
+
+    # Initialize single environment
+    # env = gym.make(agent_config['name'])
+    # env = gym.wrappers.RecordEpisodeStatistics(env)
+
+    # Initialize vectorized environment
+    num_envs = agent_config['num_envs']
+    envs = gym.make_vec(agent_config['name'], num_envs=num_envs, vectorization_mode='sync')
+    envs = RecordEpisodeStatistics(envs)
+
     # Instantiate Agent 
     agent = make_agent( 
-        algo,
-        env.observation_space.shape[0],
-        env.action_space.n,
+        agent_config['algo'],
+        envs.single_observation_space.shape[0],
+        envs.single_action_space.n,
         config=agent_config
     )
 
     # Initialize Weights & Biases if tracking is enabled
-    if use_wandb:
+    if agent_config['track']:
         import wandb
 
         wandb.init(
-            project=wandb_project,
-            group=group_name,
+            project=agent_config["wandb_project"],
+            group=agent_config['group'],
             name=run_name,
             config=config,
             sync_tensorboard=True,               
             save_code=True,
         )
-        print(f"Weights & Biases tracking initialized for project: {wandb_project} (group: {group_name})")
+        print(f"Weights & Biases tracking initialized for project: {agent_config['wandb_project']} (group: {agent_config['group']})")
 
     # setup tensorboard logger
     writer = SummaryWriter(log_dir=log_dir)
     print(f"Tensorboard logging to: {log_dir}")
 
     # train the agent
-    agent.learn(env, writer=writer)
+    agent.learn(envs, writer=writer)
     
-    env.close()
+    envs.close()
     writer.close()
     
-    if use_wandb:
+    if agent_config['track']:
         import wandb
         if wandb.run:
             wandb.finish()
