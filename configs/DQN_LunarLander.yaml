@@ -1,5 +1,5 @@
 # Algo selection
-algo: 'DQN'  # choose from DQN, DoubleDQN and DuelingDQN
+algo: 'VecDQN'  # choose from DQN, VecDQN, DoubleDQN and DuelingDQN
 
 # Environment settings
 env:

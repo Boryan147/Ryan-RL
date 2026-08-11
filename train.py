@@ -88,7 +88,7 @@ def train(config_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train an RL Agent")
-    parser.add_argument("--config", type=str, default="configs/DQN_cartpole.yaml", help="Path to config file")
+    parser.add_argument("--config", type=str, default="configs/DQN_LunarLander.yaml", help="Path to config file")
     args = parser.parse_args()
     
     train(args.config)
