@@ -21,7 +21,6 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=2.5e-4, help='learning rate of the optimizer')
     parser.add_argument('--seed', type=int, default=15, help='random seed of the experiment')
     parser.add_argument('--timesteps', type=int, default=25000, help='total timesteps of the experiment')
-    # help reproduce experiment
     parser.add_argument('--torch-deterministic', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True,
         help='if toggled, torch.backends.cudnn.deterministic=False')
     parser.add_argument('--cuda', type=lambda x:bool(strtobool(x)), default=True, nargs='?', const=True,
@@ -61,15 +60,15 @@ def parse_args():
     return args
 
 def make_env(gym_id, seed, idx, capture_video, run_name):
-        def init_env():
-            env = gym.make(gym_id, render_mode='rgb_array')
-            env = gym.wrappers.RecordEpisodeStatistics(env)
-            if capture_video:
-                 if idx == 0:
-                    env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 1000 == 0)
-            env.reset(seed=seed)
-            return env
-        return init_env
+    def init_env():
+        env = gym.make(gym_id, render_mode='rgb_array')
+        env = gym.wrappers.RecordEpisodeStatistics(env)
+        if capture_video:
+            if idx == 0:
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 1000 == 0)
+        env.reset(seed=seed)
+        return env
+    return init_env
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     nn.init.orthogonal_(layer.weight, std)

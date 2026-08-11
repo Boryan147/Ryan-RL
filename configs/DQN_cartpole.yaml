@@ -1,10 +1,9 @@
 # Algo selection
-algo: 'DQN'
+algo: 'DuelingDQN'  # choose from DQN, DoubleDQN and DuelingDQN
 
 # Environment settings
 env:
   name: 'CartPole-v1'
-  max_steps: 500
 
 # Neural network architecture
 network:
@@ -28,12 +27,12 @@ exploration:
 training:
   n_episode: 700
   seed: 19 # run 5 times with different seeds 15, 16, 17, 18, 19
-  save_dir: './results/DQN_cartpole'
+  save_dir: './results/DuelingDQN_cartpole'
 
 # Experiment tracking & video recording settings
 logging:
   track: true           # Set to true to enable Weights & Biases tracking
   wandb_project: 'Ryan-RL'
-  group: 'CartPole-v1_DQN' # group name for W&B multi-seed aggregation
+  group: 'CartPole-v1_DuelingDQN' # group name for W&B multi-seed aggregation
   capture_video: false   # Set to true to record MP4 videos
   video_trigger: 100     # Record video every N episodes
