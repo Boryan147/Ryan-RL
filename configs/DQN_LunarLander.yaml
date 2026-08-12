@@ -27,7 +27,7 @@ exploration:
 # training parameters
 training:
   total_timesteps: 300000
-  seed: 15 # run 5 times with different seeds 15, 16, 17, 18, 19
+  seed: 19 # run 5 times with different seeds 15, 16, 17, 18, 19
   save_dir: './results/DQN_LunarLander'
 
 # Experiment tracking & video recording settings
