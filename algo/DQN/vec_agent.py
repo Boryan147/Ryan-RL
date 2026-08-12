@@ -94,10 +94,12 @@ class VecDQNAgent:
         global_step = 0
         episode_reward = []
         num_envs = envs.num_envs
+        total_timesteps = self.config['total_timesteps']
+        last_printed_step = 0
 
         obs, infos = envs.reset(seed=self.config['seed'])
 
-        while len(episode_reward) < self.config['n_episode']:
+        while global_step < total_timesteps:
             global_step += num_envs
             obs_tensor = torch.tensor(obs, dtype=torch.float32).to(self.device)
 
@@ -135,7 +137,9 @@ class VecDQNAgent:
                             writer.add_scalar('charts/episodic reward', epi_return, global_step)
                             writer.add_scalar('charts/episodic length', epi_length, global_step)
 
-            if len(episode_reward) > 0 and len(episode_reward) % 50 == 0:
+            # Print training progress every 10,000 global steps
+            if global_step - last_printed_step >= 10000 and len(episode_reward) > 0:
+                last_printed_step = global_step
                 avg_rew = np.mean(episode_reward[-50:])
-                print(f"Episodes {len(episode_reward):4d}/{self.config['n_episode']} | Last 50 Avg rewards: {avg_rew:6.2f}")
+                print(f"Step {global_step:7d}/{total_timesteps} | Episodes: {len(episode_reward):4d} | Last 50 Avg Reward: {avg_rew:6.2f}")
 
