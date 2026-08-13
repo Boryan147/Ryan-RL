@@ -1,5 +1,5 @@
 # Algo selection
-algo: 'VecDQN'  # choose from DQN, VecDQN, DoubleDQN and DuelingDQN
+algo: 'VecDuelingDQN'  # choose from VecDQN, VecDoubleDQN and VecDuelingDQN
 
 # Environment settings
 env:
@@ -27,13 +27,13 @@ exploration:
 # training parameters
 training:
   total_timesteps: 300000
-  seed: 15 # run 5 times with different seeds 15, 16, 17, 18, 19
-  save_dir: './results/DQN_LunarLander'
+  seed: 19 # run 5 times with different seeds 15, 16, 17, 18, 19
+  save_dir: './results/DuelingDQN_LunarLander'
 
 # Experiment tracking & video recording settings
 logging:
   track: true           # Set to true to enable Weights & Biases tracking
   wandb_project: 'Ryan-RL'
-  group: 'LunarLander_DQN' # group name for W&B multi-seed aggregation
+  group: 'LunarLander_DuelingDQN' # group name for W&B multi-seed aggregation
   # capture_video: false   # Set to true to record MP4 videos
   # video_trigger: 100     # Record video every N episodes
