@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 import torch.optim as optim
 from algo.DQN.Dueling_DQN.dueling_net import Dueling_DQN
 from algo.DQN.Double_DQN.vec_agent import VecDoubleDQNAgent
