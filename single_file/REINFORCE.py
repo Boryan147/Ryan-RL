@@ -42,8 +42,15 @@ def reward_to_go(rewards, gamma):
         returns[i] = rewards[i] + (gamma * rewards[i+1] if i+1 < len_epi else 0)
     return returns
 
-def gae(returns, lamb):
-    
+def gae(rewards, values, gamma, gae_lambda):
+    deltas = np.zeros_like(rewards)
+    n = len(rewards)
+    for i in range(n):
+        deltas[i] = rewards[i] + gamma * (0 if i+1 == n else values[i+1]) - values[i]
+    gaes = np.zeros_like(rewards)
+    for i in reversed(range(n)):
+        gaes[i] = deltas[i] + (gamma * gae_lambda * deltas[i+1] if i+1 < n else 0)
+    return gaes
 
 if __name__ == "__main__":
     # set the seed
@@ -68,7 +75,7 @@ if __name__ == "__main__":
 
     # hyperparameters
     gamma = 0.99
-    lamb = 0.95
+    gae_lambda = 0.95
     num_epi = 600
     num_traj = 5
 
@@ -92,6 +99,9 @@ if __name__ == "__main__":
             values.append(value)
 
             obs = next_obs
+            if done:
+                value = agent.get_value(obs)
+                values.append(value)
 
         if i == num_epi:
 
