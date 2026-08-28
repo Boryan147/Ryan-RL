@@ -34,18 +34,18 @@ class Agent(nn.Module):
     def get_value(self, x):
         return self.valuenet(x)
 
-def reward_to_go(rewards, gamma):
+def reward_to_go(rewards, last_v, gamma):
     returns = np.zeros_like(rewards)
     len_epi = len(rewards)
     for i in reversed(range(len_epi)):
-        returns[i] = rewards[i] + (gamma * returns[i+1] if i+1 < len_epi else 0)
+        returns[i] = rewards[i] + gamma * (returns[i+1] if i+1 < len_epi else last_v)
     return returns
 
-def gae(rewards, values, gamma, gae_lambda):
+def gae(rewards, values, last_v, gamma, gae_lambda):
     deltas = np.zeros_like(rewards)
     n = len(rewards)
     for i in range(n):
-        deltas[i] = rewards[i] + gamma * (0 if i+1 == n else values[i+1]) - values[i]
+        deltas[i] = rewards[i] + gamma * (last_v if i+1 == n else values[i+1]) - values[i]
     gaes = np.zeros_like(rewards)
     for i in reversed(range(n)):
         gaes[i] = deltas[i] + (gamma * gae_lambda * gaes[i+1] if i+1 < n else 0)
@@ -105,12 +105,15 @@ if __name__ == "__main__":
             entropys.append(entropy)
 
             obs = next_obs
-        value = agent.get_value(obs)
-        values.append(value)
+        if terminated:
+            last_v = 0
+        else:
+            last_v = agent.get_value(obs).item()
+
         entropy_loss = torch.cat(entropys).mean()
 
         # advantage normalization
-        advantages = torch.tensor(gae(rewards, values, gamma, gae_lambda), dtype=torch.float32, device=device).detach()
+        advantages = torch.tensor(gae(rewards, values, last_v, gamma, gae_lambda), dtype=torch.float32, device=device).detach()
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         # estimate policy gradient & update policy
         pg_loss = -(torch.cat(logprobs) * advantages).mean()
@@ -119,8 +122,8 @@ if __name__ == "__main__":
         optimizer.step()
 
         # explained variance of value function
-        v_target = torch.tensor(reward_to_go(rewards, gamma), dtype=torch.float32).to(device)
-        v_pred = torch.cat(values[:-1]).view(-1)
+        v_target = torch.tensor(reward_to_go(rewards, last_v, gamma), dtype=torch.float32).to(device)
+        v_pred = torch.cat(values).view(-1)
         explained_var = 1 - (v_target - v_pred).var() / (v_target.var() + 1e-8)
 
         # define MSE loss for value function & update value
