@@ -85,7 +85,7 @@ if __name__ == "__main__":
     global_step = 0
 
     # training loop
-    for i in range(num_epi):
+    for i in range(num_epi + 1):
         logprobs, rewards, values, entropys = [], [], [], []
         obs, info = env.reset(seed=seed) if i == 0 else env.reset()
         obs = torch.tensor(obs, dtype=torch.float32).to(device).unsqueeze(0) # shape (1, obs_size)
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         advantages = torch.tensor(gae(rewards, values, gamma, gae_lambda), dtype=torch.float32, device=device).detach()
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         # estimate policy gradient & update policy
-        pg_loss = -(torch.cat(logprobs) * advantages).sum()
+        pg_loss = -(torch.cat(logprobs) * advantages).mean()
         optimizer.zero_grad()
         pg_loss.backward()
         optimizer.step()
