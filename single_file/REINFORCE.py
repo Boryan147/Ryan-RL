@@ -9,24 +9,29 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    nn.init.orthogonal_(layer.weight, std)
+    nn.init.constant_(layer.bias, bias_const)
+    return layer
+
 # Policy and value networks
 class Agent(nn.Module):
     def __init__(self, obs_size, act_size):
         super().__init__()
         self.policynet = nn.Sequential(
-            nn.Linear(obs_size, 64),
+            layer_init(nn.Linear(obs_size, 64)),
             nn.Tanh(),
-            nn.Linear(64, 64),
+            layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            nn.Linear(64, act_size)
+            layer_init(nn.Linear(64, act_size), std=0.01)
         )
 
         self.valuenet = nn.Sequential(
-            nn.Linear(obs_size, 64),
+            layer_init(nn.Linear(obs_size, 64)),
             nn.Tanh(),
-            nn.Linear(64, 64),
+            layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            nn.Linear(64, 1)
+            layer_init(nn.Linear(64, 1), std=1.0)
         )
         self.policy_logstd = nn.Parameter(torch.zeros(act_size))
 
@@ -155,6 +160,7 @@ if __name__ == "__main__":
         pg_loss = -(logp_buf * b_adv).mean()
         optimizer.zero_grad()
         pg_loss.backward()
+        nn.utils.clip_grad_norm_(policy_params, max_norm=0.5)
         optimizer.step()
 
         # define MSE loss for value function & update value
@@ -168,6 +174,7 @@ if __name__ == "__main__":
             v_loss = v_criterion(v_pred, b_ret)
             optimizer_value.zero_grad()
             v_loss.backward()
+            nn.utils.clip_grad_norm_(agent.valuenet.parameters(), max_norm=0.5)
             optimizer_value.step()
 
         print(f'Epoch {epoch+1}/{num_epoches}, Global Step: {global_step}')
