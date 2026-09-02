@@ -96,7 +96,7 @@ class Agent(nn.Module):
     def get_value(self, x):
         return self.critic(x)
 
-    def get_action_and_value(self, x, action=None): # action ???
+    def get_action_and_value(self, x, action=None): 
         logits = self.actor(x)
         probs = Categorical(logits=logits)
         if action is None:

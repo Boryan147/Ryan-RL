@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
+from torch.distributions.normal import Normal
 
 # Policy and value networks
 class Agent(nn.Module):
@@ -14,22 +15,28 @@ class Agent(nn.Module):
         super().__init__()
         self.policynet = nn.Sequential(
             nn.Linear(obs_size, 64),
-            nn.ReLU(),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
             nn.Linear(64, act_size)
         )
 
         self.valuenet = nn.Sequential(
             nn.Linear(obs_size, 64),
-            nn.ReLU(),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
             nn.Linear(64, 1)
         )
+        self.policy_logstd = nn.Parameter(torch.zeros(act_size))
 
     def get_action_and_value(self, x, act=None):
-        logits = self.policynet(x)
-        probs = Categorical(logits=logits)
+        mean = self.policynet(x)
+        std = self.policy_logstd.exp()
+        probs = Normal(loc=mean, scale=std)
         if act is None:
             act = probs.sample()
-        return act, probs.log_prob(act), probs.entropy(), self.valuenet(x)
+        return act, probs.log_prob(act).sum(dim=-1), probs.entropy().sum(dim=-1), self.valuenet(x)
 
     def get_value(self, x):
         return self.valuenet(x)
@@ -66,23 +73,24 @@ if __name__ == "__main__":
         'mps' if torch.backends.mps.is_available() else
         'cpu'
     )
-    run_name = f"CartPole-v1_REINFORCE_seed{seed}__{int(time.time())}"
+    run_name = f"Pendulum-v1_REINFORCE_seed{seed}__{int(time.time())}"
     writer = SummaryWriter(f'runs/{run_name}')
 
-    env = gym.make('CartPole-v1', render_mode='rgb_array')
+    env = gym.make('Pendulum-v1', render_mode='rgb_array')
     env = gym.wrappers.RecordEpisodeStatistics(env)
-    env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 50 == 0)
-    agent = Agent(env.observation_space.shape[0], env.action_space.n).to(device)
+    env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 300 == 0)
+    agent = Agent(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
 
     # hyperparameters
     gamma = 0.99
     gae_lambda = 0.97
-    po_lr = 5e-3
-    v_lr = 3e-3
-    num_epoches = 100
-    num_steps = 1000
+    po_lr = 3e-4
+    v_lr = 1e-3
+    num_epoches = 150
+    num_steps = 2000
 
-    optimizer = optim.Adam(agent.policynet.parameters(), lr=po_lr)
+    policy_params = list(agent.policynet.parameters()) + [agent.policy_logstd]
+    optimizer = optim.Adam(policy_params, lr=po_lr)
     optimizer_value = optim.Adam(agent.valuenet.parameters(), lr=v_lr)
 
     obs, info = env.reset(seed=seed)
@@ -94,7 +102,7 @@ if __name__ == "__main__":
     for epoch in range(num_epoches):
         # storage buffer setup
         obs_buf = torch.zeros((num_steps, env.observation_space.shape[0]), device=device)
-        act_buf = torch.zeros(num_steps, device=device)
+        act_buf = torch.zeros((num_steps, env.action_space.shape[0]), device=device)
         rew_buf = np.zeros(num_steps, dtype=np.float32)
         val_buf = np.zeros(num_steps, dtype=np.float32)
         adv_buf = np.zeros(num_steps, dtype=np.float32)
@@ -108,7 +116,8 @@ if __name__ == "__main__":
                     obs = torch.tensor(obs, dtype=torch.float32).to(device).unsqueeze(0)
                 global_step += 1
                 act, logprob, _, value = agent.get_action_and_value(obs)
-                next_obs, reward, terminated, truncated, info = env.step(act.item())
+                act_np = np.clip(act.cpu().numpy().flatten(), env.action_space.low, env.action_space.high)
+                next_obs, reward, terminated, truncated, info = env.step(act_np)
                 next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device).unsqueeze(0)
                 done = terminated or truncated
 
