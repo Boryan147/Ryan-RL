@@ -61,11 +61,11 @@ class Agent(nn.Module):
         return self.valuenet(x)
 
 def gae(rewards, values, last_v, gamma, gae_lambda):
-    deltas = np.zeros_like(rewards)
+    deltas = torch.zeros_like(rewards).to(device)
     n = len(rewards)
     for i in range(n):
         deltas[i] = rewards[i] + gamma * (last_v if i+1 == n else values[i+1]) - values[i]
-    gaes = np.zeros_like(rewards)
+    gaes = torch.zeros_like(rewards).to(device)
     for i in reversed(range(n)):
         gaes[i] = deltas[i] + (gamma * gae_lambda * gaes[i+1] if i+1 < n else 0)
     return gaes
@@ -94,22 +94,24 @@ if __name__ == "__main__":
     writer = SummaryWriter(f'runs/{run_name}')
 
     envs = gym.vector.SyncVectorEnv([make_env(gym_id, seed + i, i, run_name) for i in range(num_envs)])
+    assert isinstance(envs.single_action_space, gym.spaces.Discrete), 'only discrete action space is allowed'
+    print('envs.single_observation_space.shape', envs.single_observation_space.shape)
+    print('envs.single_action_space.n', envs.single_action_space.n)
     agent = Agent(envs).to(device)
 
     # hyperparameters
     gamma = 0.99
     gae_lambda = 0.97
-    po_lr = 3e-4
-    v_lr = 1e-3
+    lr = 2.5e-4
     ent_coef = 0.01
+    vf_coef = 0.5
 
     # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
-    optimizer_actor = optim.Adam(agent.actornet.parameters(), lr=po_lr)
-    optimizer_value = optim.Adam(agent.valuenet.parameters(), lr=v_lr)
+    optimizer = optim.Adam(agent.parameters(), lr=lr)
 
     obs, infos = envs.reset()
-    obs = torch.tensor(obs, dtype=torch.float32).to(device)
-    done = False
+    obs = torch.tensor(obs, dtype=torch.float32).to(device) # shape (num_envs, obs_size)
+    # done = False
     global_step = 0
 
     # training loop
@@ -117,32 +119,32 @@ if __name__ == "__main__":
         # storage buffer setup
         obs_buf = torch.zeros((num_steps, num_envs) + envs.single_observation_space.shape, device=device)
         act_buf = torch.zeros((num_steps, num_envs) + envs.single_action_space.shape, device=device)
-        rew_buf = np.zeros((num_steps, num_envs), dtype=np.float32)
-        val_buf = np.zeros((num_steps, num_envs), dtype=np.float32)
-        adv_buf = np.zeros((num_steps, num_envs), dtype=np.float32)
-        ret_buf = np.zeros((num_steps, num_envs), dtype=np.float32)
+        rew_buf = torch.zeros((num_steps, num_envs), device=device)
+        val_buf = torch.zeros((num_steps, num_envs), device=device)
+        adv_buf = torch.zeros((num_steps, num_envs), device=device)
+        ret_buf = torch.zeros((num_steps, num_envs), device=device)
         start_idx = 0
 
         with torch.no_grad():
             for step in range(num_steps):
-                if done:
-                    obs, info = envs.reset()
-                    obs = torch.tensor(obs, dtype=torch.float32).to(device).unsqueeze(0)
-                global_step += 1
-                act, logprob, _, value = agent.get_action_and_value(obs)
-                act_np = np.clip(act.cpu().numpy().flatten(), env.action_space.low, env.action_space.high)
-                next_obs, reward, terminated, truncated, info = env.step(act_np)
-                next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device).unsqueeze(0)
-                done = terminated or truncated
+                # if done:
+                #     obs, info = envs.reset()
+                #     obs = torch.tensor(obs, dtype=torch.float32).to(device) no need, autoreset in vecenv
+                global_step += 1 * num_envs
+                acts, logprob, _, value = agent.get_action_and_value(obs)
+                # act_np = np.clip(act.cpu().numpy().flatten(), env.action_space.low, env.action_space.high)
+                next_obs, rewards, terminateds, truncateds, infos = envs.step(acts.cpu().numpy())
+                next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device)
+                done = np.logical_or(terminateds, truncateds)
 
                 obs_buf[step] = obs
-                act_buf[step] = act
-                rew_buf[step] = reward
-                val_buf[step] = value.item()
+                act_buf[step] = acts.unsqueeze(1) # ???
+                rew_buf[step] = torch.tensor(rewards).to(device)
+                val_buf[step] = value.flatten() 
 
                 obs = next_obs
-                if done or step == num_steps - 1: 
-                    last_v = 0.0 if terminated else agent.get_value(obs).item()
+                if np.any(done) or step == num_steps - 1: 
+                    last_v = 0.0 if np.any(terminateds) else agent.get_value(obs).flatten()
                         
                     slice_ = slice(start_idx, step + 1)
                     # compute gae & TD target and populate buffer
@@ -152,38 +154,37 @@ if __name__ == "__main__":
                     start_idx = step + 1
 
                 # log performance metrics
-                if 'episode' in info:
-                    epi_return = info['episode']['r']
-                    epi_length = info['episode']['l']
-                    writer.add_scalar('charts/episodic reward', epi_return, global_step)
-                    writer.add_scalar('charts/episodic length', epi_length, global_step)
+                if 'episode' in infos:
+                    for idx in range(num_envs):
+                        if infos['_episode'][idx]:
+                            writer.add_scalar('charts/episodic reward', infos['episode']['r'][idx], global_step) # ??? 
+                            writer.add_scalar('charts/episodic length', infos['episode']['l'][idx], global_step)
 
         _, logp_buf, entropy, _ = agent.get_action_and_value(obs_buf, act=act_buf)
         entropy_loss = entropy.mean()
 
+        # flatten the buffer
+        b_logprob = logp_buf.reshape(-1)
+        b_adv = adv_buf.reshape(-1)
+        b_ret = ret_buf.reshape(-1)
+        
         # advantage normalization
-        b_adv = torch.from_numpy(adv_buf).to(device)
         b_adv = (b_adv - b_adv.mean()) / (b_adv.std() + 1e-8)
 
         # estimate policy gradient & update policy
-        pg_loss = -(logp_buf * b_adv).mean() - ent_coef * entropy_loss
-        optimizer_actor.zero_grad()
-        pg_loss.backward()
-        nn.utils.clip_grad_norm_(agent.actornet.parameters(), max_norm=0.5)
-        optimizer_actor.step()
+        pg_loss = -(b_logprob * b_adv).mean()
 
         # define MSE loss for value function & update value
-        b_ret = torch.from_numpy(ret_buf).to(device)
-        # run multiple times to update value per epoch
-        for _ in range(40):
-            v_pred = agent.get_value(obs_buf).view(-1)
-            # explained variance of value function
-            explained_var = 1 - (b_ret - v_pred).var() / (b_ret.var() + 1e-8)
-            v_loss = 0.5 * ((b_ret - v_pred) ** 2).mean()
-            optimizer_value.zero_grad()
-            v_loss.backward()
-            nn.utils.clip_grad_norm_(agent.valuenet.parameters(), max_norm=0.5)
-            optimizer_value.step()
+        v_pred = agent.get_value(obs_buf).reshape(-1)
+        # explained variance of value function
+        explained_var = 1 - (b_ret - v_pred).var() / (b_ret.var() + 1e-8)
+        v_loss = 0.5 * ((b_ret - v_pred) ** 2).mean()
+
+        total_loss = pg_loss - ent_coef * entropy_loss + vf_coef * v_loss
+        optimizer.zero_grad()
+        total_loss.backward()
+        nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
+        optimizer.step()
 
         print(f'Epoch {epoch+1}/{num_epoches}, Global Step: {global_step}')
 
