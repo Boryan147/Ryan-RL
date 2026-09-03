@@ -92,7 +92,7 @@ if __name__ == "__main__":
     po_lr = 3e-4
     v_lr = 1e-3
     num_epoches = 150
-    num_steps = 2000
+    num_steps = 3000
 
     policy_params = list(agent.policynet.parameters()) + [agent.policy_logstd]
     optimizer = optim.Adam(policy_params, lr=po_lr)
