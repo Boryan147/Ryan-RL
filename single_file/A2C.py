@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 1000 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 300 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -60,21 +60,21 @@ class Agent(nn.Module):
     def get_value(self, x):
         return self.valuenet(x)
 
-def gae(rewards, values, last_v, gamma, gae_lambda):
+def gae(rewards, values, dones, last_v, gamma, gae_lambda):
     deltas = torch.zeros_like(rewards).to(device)
     n = len(rewards)
     for i in range(n):
-        deltas[i] = rewards[i] + gamma * (last_v if i+1 == n else values[i+1]) - values[i]
+        deltas[i] = rewards[i] + gamma * (last_v if i+1 == n else values[i+1]) * (1.0 - dones[i]) - values[i]
     gaes = torch.zeros_like(rewards).to(device)
     for i in reversed(range(n)):
-        gaes[i] = deltas[i] + (gamma * gae_lambda * gaes[i+1] if i+1 < n else 0)
+        gaes[i] = deltas[i] + (gamma * gae_lambda * gaes[i+1] * (1.0 - dones[i]) if i+1 < n else 0)
     return gaes
 
 if __name__ == "__main__":
     # common arguments
     gym_id = 'CartPole-v1'
-    num_epoches = 50
-    num_steps = 128
+    num_epoches = 400
+    num_steps = 64
     num_envs = 4
     # set the seed
     seed = 15
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     # hyperparameters
     gamma = 0.99
     gae_lambda = 0.97
-    lr = 2.5e-4
+    lr = 1e-3
     ent_coef = 0.01
     vf_coef = 0.5
 
@@ -111,9 +111,7 @@ if __name__ == "__main__":
 
     obs, infos = envs.reset()
     obs = torch.tensor(obs, dtype=torch.float32).to(device) # shape (num_envs, obs_size)
-    # done = False
     global_step = 0
-
     # training loop
     for epoch in range(num_epoches):
         # storage buffer setup
@@ -121,46 +119,40 @@ if __name__ == "__main__":
         act_buf = torch.zeros((num_steps, num_envs) + envs.single_action_space.shape, device=device)
         rew_buf = torch.zeros((num_steps, num_envs), device=device)
         val_buf = torch.zeros((num_steps, num_envs), device=device)
-        adv_buf = torch.zeros((num_steps, num_envs), device=device)
-        ret_buf = torch.zeros((num_steps, num_envs), device=device)
-        start_idx = 0
+        done_buf = torch.zeros((num_steps, num_envs), device=device)
 
+        # rollout data collection
         with torch.no_grad():
             for step in range(num_steps):
-                # if done:
-                #     obs, info = envs.reset()
-                #     obs = torch.tensor(obs, dtype=torch.float32).to(device) no need, autoreset in vecenv
                 global_step += 1 * num_envs
                 acts, logprob, _, value = agent.get_action_and_value(obs)
                 # act_np = np.clip(act.cpu().numpy().flatten(), env.action_space.low, env.action_space.high)
                 next_obs, rewards, terminateds, truncateds, infos = envs.step(acts.cpu().numpy())
                 next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device)
                 done = np.logical_or(terminateds, truncateds)
+                done = torch.tensor(done).to(device)
 
                 obs_buf[step] = obs
-                act_buf[step] = acts.unsqueeze(1) # ???
-                rew_buf[step] = torch.tensor(rewards).to(device)
+                act_buf[step] = acts
+                rew_buf[step] = torch.tensor(rewards, dtype=torch.float32).to(device)
                 val_buf[step] = value.flatten() 
+                done_buf[step] = done
 
                 obs = next_obs
-                if np.any(done) or step == num_steps - 1: 
-                    last_v = 0.0 if np.any(terminateds) else agent.get_value(obs).flatten()
-                        
-                    slice_ = slice(start_idx, step + 1)
-                    # compute gae & TD target and populate buffer
-                    adv_buf[slice_] = gae(rew_buf[slice_], val_buf[slice_], last_v, gamma, gae_lambda)
-                    ret_buf[slice_] = adv_buf[slice_] + val_buf[slice_]
-
-                    start_idx = step + 1
 
                 # log performance metrics
                 if 'episode' in infos:
                     for idx in range(num_envs):
                         if infos['_episode'][idx]:
-                            writer.add_scalar('charts/episodic reward', infos['episode']['r'][idx], global_step) # ??? 
+                            writer.add_scalar('charts/episodic reward', infos['episode']['r'][idx], global_step) 
                             writer.add_scalar('charts/episodic length', infos['episode']['l'][idx], global_step)
 
-        _, logp_buf, entropy, _ = agent.get_action_and_value(obs_buf, act=act_buf)
+            with torch.no_grad():
+                last_v = agent.valuenet(obs).flatten()
+                adv_buf = gae(rew_buf, val_buf, done_buf, last_v, gamma, gae_lambda)
+                ret_buf = adv_buf + val_buf
+
+        _, logp_buf, entropy, v_pred = agent.get_action_and_value(obs_buf, act=act_buf)
         entropy_loss = entropy.mean()
 
         # flatten the buffer
@@ -175,7 +167,7 @@ if __name__ == "__main__":
         pg_loss = -(b_logprob * b_adv).mean()
 
         # define MSE loss for value function & update value
-        v_pred = agent.get_value(obs_buf).reshape(-1)
+        v_pred = v_pred.reshape(-1)
         # explained variance of value function
         explained_var = 1 - (b_ret - v_pred).var() / (b_ret.var() + 1e-8)
         v_loss = 0.5 * ((b_ret - v_pred) ** 2).mean()
