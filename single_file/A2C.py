@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 30 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 300 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -73,8 +73,8 @@ def gae(rewards, values, dones, last_v, gamma, gae_lambda):
 if __name__ == "__main__":
     # common arguments
     gym_id = 'Pendulum-v1'
-    num_epoches = 400
-    num_steps = 64
+    num_epoches = 2000
+    num_steps = 128
     num_envs = 4
     # set the seed
     seed = 15
@@ -106,8 +106,9 @@ if __name__ == "__main__":
     ent_coef = 0.0
     vf_coef = 0.5
 
-    # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
-    optimizer = optim.Adam(agent.parameters(), lr=lr)
+    actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
+    optimizer_actor = optim.Adam(actor_params, lr=3e-4)
+    optimizer_critic = optim.Adam(agent.valuenet.parameters(), lr=1e-3)
 
     obs, infos = envs.reset()
     obs = torch.tensor(obs, dtype=torch.float32).to(device) # shape (num_envs, obs_size)
@@ -172,11 +173,16 @@ if __name__ == "__main__":
         explained_var = 1 - (b_ret - v_pred).var() / (b_ret.var() + 1e-8)
         v_loss = 0.5 * ((b_ret - v_pred) ** 2).mean()
 
-        total_loss = pg_loss - ent_coef * entropy_loss + vf_coef * v_loss
-        optimizer.zero_grad()
-        total_loss.backward()
-        nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
-        optimizer.step()
+        # total_loss = pg_loss - ent_coef * entropy_loss + vf_coef * v_loss
+        optimizer_actor.zero_grad()
+        pg_loss.backward()
+        nn.utils.clip_grad_norm_(actor_params, max_norm=0.5)
+        optimizer_actor.step()
+
+        optimizer_critic.zero_grad()
+        v_loss.backward()
+        nn.utils.clip_grad_norm_(agent.valuenet.parameters(), max_norm=1.0)
+        optimizer_critic.step()
 
         print(f'Epoch {epoch+1}/{num_epoches}, Global Step: {global_step}')
 
