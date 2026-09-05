@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 300 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 30 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -34,7 +34,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01)
+            layer_init(nn.Linear(64, envs.single_action_space.shape[0]), std=0.01)
         )
 
         self.valuenet = nn.Sequential(
@@ -44,18 +44,18 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0)
         )
-        # self.actor_logstd = nn.Parameter(torch.zeros(envs.single_action_space.shape[0]))
+        self.actor_logstd = nn.Parameter(torch.zeros(envs.single_action_space.shape[0]))
 
     def get_action_and_value(self, x, act=None):
-        # mean = self.actornet(x)
-        # std = self.actor_logstd.exp()
-        # probs = Normal(loc=mean, scale=std)
-        logits = self.actornet(x)
-        probs = Categorical(logits=logits)
+        mean = self.actornet(x)
+        std = self.actor_logstd.exp()
+        probs = Normal(loc=mean, scale=std)
+        # logits = self.actornet(x)
+        # probs = Categorical(logits=logits)
         if act is None:
             act = probs.sample()
-        return act, probs.log_prob(act), probs.entropy(), self.valuenet(x)
-        # return act, probs.log_prob(act).sum(dim=-1), probs.entropy().sum(dim=-1), self.valuenet(x)
+        # return act, probs.log_prob(act), probs.entropy(), self.valuenet(x)
+        return act, probs.log_prob(act).sum(dim=-1), probs.entropy().sum(dim=-1), self.valuenet(x)
 
     def get_value(self, x):
         return self.valuenet(x)
@@ -72,7 +72,7 @@ def gae(rewards, values, dones, last_v, gamma, gae_lambda):
 
 if __name__ == "__main__":
     # common arguments
-    gym_id = 'CartPole-v1'
+    gym_id = 'Pendulum-v1'
     num_epoches = 400
     num_steps = 64
     num_envs = 4
@@ -94,16 +94,16 @@ if __name__ == "__main__":
     writer = SummaryWriter(f'runs/{run_name}')
 
     envs = gym.vector.SyncVectorEnv([make_env(gym_id, seed + i, i, run_name) for i in range(num_envs)])
-    assert isinstance(envs.single_action_space, gym.spaces.Discrete), 'only discrete action space is allowed'
+    assert isinstance(envs.single_action_space, gym.spaces.Box), 'only continuous action space is allowed'
     print('envs.single_observation_space.shape', envs.single_observation_space.shape)
-    print('envs.single_action_space.n', envs.single_action_space.n)
+    print('envs.single_action_space.shape', envs.single_action_space.shape)
     agent = Agent(envs).to(device)
 
     # hyperparameters
     gamma = 0.99
     gae_lambda = 0.97
     lr = 1e-3
-    ent_coef = 0.01
+    ent_coef = 0.0
     vf_coef = 0.5
 
     # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
@@ -126,8 +126,8 @@ if __name__ == "__main__":
             for step in range(num_steps):
                 global_step += 1 * num_envs
                 acts, logprob, _, value = agent.get_action_and_value(obs)
-                # act_np = np.clip(act.cpu().numpy().flatten(), env.action_space.low, env.action_space.high)
-                next_obs, rewards, terminateds, truncateds, infos = envs.step(acts.cpu().numpy())
+                act_np = np.clip(acts.cpu().numpy(), envs.single_action_space.low, envs.single_action_space.high)
+                next_obs, rewards, terminateds, truncateds, infos = envs.step(act_np)
                 next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device)
                 done = np.logical_or(terminateds, truncateds)
                 done = torch.tensor(done).to(device)
@@ -147,10 +147,10 @@ if __name__ == "__main__":
                             writer.add_scalar('charts/episodic reward', infos['episode']['r'][idx], global_step) 
                             writer.add_scalar('charts/episodic length', infos['episode']['l'][idx], global_step)
 
-            with torch.no_grad():
-                last_v = agent.valuenet(obs).flatten()
-                adv_buf = gae(rew_buf, val_buf, done_buf, last_v, gamma, gae_lambda)
-                ret_buf = adv_buf + val_buf
+        with torch.no_grad():
+            last_v = agent.valuenet(obs).flatten()
+            adv_buf = gae(rew_buf, val_buf, done_buf, last_v, gamma, gae_lambda)
+            ret_buf = adv_buf + val_buf
 
         _, logp_buf, entropy, v_pred = agent.get_action_and_value(obs_buf, act=act_buf)
         entropy_loss = entropy.mean()
