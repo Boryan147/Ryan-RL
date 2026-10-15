@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 100 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 50 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -111,6 +111,7 @@ if __name__ == "__main__":
     ent_coef = 0.01
     vf_coef = 0.5
     clip_coe = 0.2
+    target_kl = 0.01
 
     # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
     optimizer = optim.Adam(agent.parameters(), lr=lr)
@@ -168,17 +169,26 @@ if __name__ == "__main__":
         b_adv = adv_buf.reshape(-1)
         b_ret = ret_buf.reshape(-1)
 
+        clipfrac = []
         for epoch in range(num_epoches):
             # shuffle old rollout
             indices = torch.randperm(batch_size)
             s_obs, s_act, s_logp, s_adv, s_ret = b_obs[indices], b_act[indices], b_logp[indices], b_adv[indices], b_ret[indices]
             pointer = 0
+            # minibatch loop update
             for i in range(num_minibatch):
                 slice_ = slice(pointer, pointer + minibatch_size)
                 pointer += minibatch_size
                 _, newlogp, entropy, v_pred = agent.get_action_and_value(s_obs[slice_], act=s_act[slice_])
 
-                ratio = torch.exp(newlogp - s_logp[slice_])
+                logratio = newlogp - s_logp[slice_]
+                ratio = torch.exp(logratio)
+                # monitor KL divergence
+                with torch.no_grad():
+                    old_approx_kl = (-logratio).mean()  # k1
+                    approx_kl = ((ratio - 1) - logratio).mean()  # k3
+                    clipfrac += [((ratio - 1).abs() > clip_coe).float().mean()]
+
                 # advantage normalization
                 adv_n = (s_adv[slice_] - s_adv[slice_].mean()) / (s_adv[slice_].std() + 1e-8)
 
@@ -200,11 +210,17 @@ if __name__ == "__main__":
                 nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
                 optimizer.step()
 
+            # if approx_kl > target_kl:
+            #     break
+
         print(f'iter: {iteration+1}/{num_iter} with global steps: {global_step}')
 
         # log loss metrics
         writer.add_scalar('losses/policy_loss', pg_loss.item(), global_step)
         writer.add_scalar('losses/value_loss', v_loss.item(), global_step)
+        writer.add_scalar('losses/approx_kl', approx_kl.item(), global_step)
+        writer.add_scalar('losses/old_approx_kl', old_approx_kl.item(), global_step)
+        writer.add_scalar('losses/clipfrac', np.mean(clipfrac), global_step)
         writer.add_scalar('losses/explained_variance', explained_var.item(), global_step)
         writer.add_scalar('losses/entropy', entropy_loss.item(), global_step)
 

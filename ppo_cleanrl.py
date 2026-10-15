@@ -244,7 +244,7 @@ if __name__ == "__main__":
                     b_obs[mb_inds], b_actions.long()[mb_inds]
                 )
                 logratio = newlogprob - b_logprobs[mb_inds]
-                ratio = logratio.exp() ## don't understand
+                ratio = logratio.exp()
 
                 with torch.no_grad():
                     # calculate approx_kl
@@ -259,7 +259,7 @@ if __name__ == "__main__":
                 # policy loss
                 pg_loss1 = -mb_advantages * ratio
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean() # why max & negative not min & positive oh psedu-loss
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean() 
 
                 # value loss
                 new_values = new_values.view(-1)
