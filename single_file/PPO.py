@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 500 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 100 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -73,14 +73,14 @@ def gae(rewards, values, dones, last_v, gamma, gae_lambda):
 if __name__ == "__main__":
     # common arguments
     gym_id = 'CartPole-v1'
-    num_iter = 10
+    num_iter = 300
     num_epoches = 4
     num_steps = 128
     num_envs = 4
     batch_size = num_steps * num_envs
     minibatch_size = 128
     num_minibatch = batch_size // minibatch_size
-    clip_coe = 0.2
+
     # set the seed
     seed = 15
     random.seed(seed)
@@ -106,10 +106,11 @@ if __name__ == "__main__":
 
     # hyperparameters
     gamma = 0.99
-    gae_lambda = 0.97
-    lr = 1e-3
-    ent_coef = 0.0
+    gae_lambda = 0.95
+    lr = 2.5e-4
+    ent_coef = 0.01
     vf_coef = 0.5
+    clip_coe = 0.2
 
     # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
     optimizer = optim.Adam(agent.parameters(), lr=lr)
@@ -198,6 +199,8 @@ if __name__ == "__main__":
                 total_loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
                 optimizer.step()
+
+        print(f'iter: {iteration+1}/{num_iter} with global steps: {global_step}')
 
         # log loss metrics
         writer.add_scalar('losses/policy_loss', pg_loss.item(), global_step)
