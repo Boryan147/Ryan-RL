@@ -187,7 +187,7 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     old_approx_kl = (-logratio).mean()  # k1
                     approx_kl = ((ratio - 1) - logratio).mean()  # k3
-                    clipfrac += [((ratio - 1).abs() > clip_coe).float().mean()]
+                    clipfrac += [((ratio - 1).abs() > clip_coe).float().mean().cpu()]
 
                 # advantage normalization
                 adv_n = (s_adv[slice_] - s_adv[slice_].mean()) / (s_adv[slice_].std() + 1e-8)
