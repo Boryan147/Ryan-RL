@@ -20,7 +20,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 300 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 500 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -34,7 +34,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.shape[0]), std=0.01)
+            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01)
         )
 
         self.criticnet = nn.Sequential(
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     num_envs = 4
     batch_size = num_steps * num_envs
     minibatch_size = 128
-    num_minibatch = batch_size / minibatch_size
+    num_minibatch = batch_size // minibatch_size
     clip_coe = 0.2
     # set the seed
     seed = 15
@@ -175,19 +175,19 @@ if __name__ == "__main__":
             for i in range(num_minibatch):
                 slice_ = slice(pointer, pointer + minibatch_size)
                 pointer += minibatch_size
-                _, newlogp, entropy, _ = agent.get_action_and_value(s_obs[slice_], act=s_act[slice_])
+                _, newlogp, entropy, v_pred = agent.get_action_and_value(s_obs[slice_], act=s_act[slice_])
 
                 ratio = torch.exp(newlogp - s_logp[slice_])
                 # advantage normalization
-                s_adv = (s_adv - s_adv.mean()) / (s_adv.std() + 1e-8)
+                adv_n = (s_adv[slice_] - s_adv[slice_].mean()) / (s_adv[slice_].std() + 1e-8)
 
-                clipped_loss = torch.clamp(ratio, min=1 - clip_coe, max=1 + clip_coe) * s_adv[slice_]
-                actual_loss = ratio * s_adv[slice_]
+                clipped_loss = torch.clamp(ratio, min=1 - clip_coe, max=1 + clip_coe) * adv_n
+                actual_loss = ratio * adv_n
                 pg_loss = -torch.minimum(actual_loss, clipped_loss).mean()
 
                 entropy_loss = entropy.mean()
 
-                v_pred = agent.get_value(s_obs[slice_])
+                v_pred = v_pred.flatten()
                 # explained variance of value function
                 explained_var = 1 - (s_ret[slice_] - v_pred).var() / (s_ret[slice_].var() + 1e-8)
                 v_loss = 0.5 * ((s_ret[slice_] - v_pred) ** 2).mean()
@@ -198,14 +198,12 @@ if __name__ == "__main__":
                 total_loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
                 optimizer.step()
-                
-                print(f'Epoch {epoch+1}/{num_epoches}, Global Step: {global_step}')
 
-                # log loss metrics
-                writer.add_scalar('losses/policy_loss', pg_loss.item(), global_step)
-                writer.add_scalar('losses/value_loss', v_loss.item(), global_step)
-                writer.add_scalar('losses/explained_variance', explained_var.item(), global_step)
-                writer.add_scalar('losses/entropy', entropy_loss.item(), global_step)
+        # log loss metrics
+        writer.add_scalar('losses/policy_loss', pg_loss.item(), global_step)
+        writer.add_scalar('losses/value_loss', v_loss.item(), global_step)
+        writer.add_scalar('losses/explained_variance', explained_var.item(), global_step)
+        writer.add_scalar('losses/entropy', entropy_loss.item(), global_step)
 
     envs.close()
     writer.close()
