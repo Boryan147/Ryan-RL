@@ -170,6 +170,11 @@ if __name__ == "__main__":
         b_ret = ret_buf.reshape(-1)
 
         clipfrac = []
+        # anneal learning rate
+        lr_frac = 1.0 - iteration / num_iter
+        lr_now = lr_frac * lr
+        optimizer.param_groups[0]['lr'] = lr_now
+    
         for epoch in range(num_epoches):
             # shuffle old rollout
             indices = torch.randperm(batch_size)
@@ -216,6 +221,7 @@ if __name__ == "__main__":
         print(f'iter: {iteration+1}/{num_iter} with global steps: {global_step}')
 
         # log loss metrics
+        writer.add_scalar('losses/learning_rate', optimizer.param_groups[0]['lr'], global_step)
         writer.add_scalar('losses/policy_loss', pg_loss.item(), global_step)
         writer.add_scalar('losses/value_loss', v_loss.item(), global_step)
         writer.add_scalar('losses/approx_kl', approx_kl.item(), global_step)
