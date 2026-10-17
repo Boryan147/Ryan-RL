@@ -17,11 +17,14 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
     def init_env():
         env = gym.make(gym_id, render_mode='rgb_array')
         env = gym.wrappers.RecordEpisodeStatistics(env)
+        env = gym.wrappers.ClipAction(env)
+        env = gym.wrappers.NormalizeReward(env, gamma=gamma)
+        env = gym.wrappers.TransformReward(env, lambda r: np.clip(r, -10, 10))
         env = gym.wrappers.NormalizeObservation(env)
         env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 200 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 100 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -45,7 +48,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0)
         )
-        self.actor_logstd = nn.Parameter(torch.zeros(envs.single_action_space.shape[0]))
+        self.actor_logstd = nn.Parameter(torch.zeros(1, envs.single_action_space.shape[0]))
 
     def get_action_and_value(self, x, act=None):
         mean = self.actornet(x)
@@ -70,15 +73,24 @@ def gae(rewards, values, dones, last_v, gamma, gae_lambda):
 
 if __name__ == "__main__":
     # common arguments
-    gym_id = 'Pendulum-v1'
+    gym_id = 'HalfCheetah-v5'
     total_timesteps = 1000000
-    num_steps = 1024
-    num_envs = 4
+    num_steps = 2048
+    num_envs = 1
     batch_size = num_steps * num_envs
     num_iter = total_timesteps // batch_size
     num_epoches = 10
-    minibatch_size = 256
+    minibatch_size = 64
     num_minibatch = batch_size // minibatch_size
+
+    # hyperparameters
+    gamma = 0.99
+    gae_lambda = 0.95
+    lr = 3e-4
+    ent_coef = 0.0
+    vf_coef = 0.5
+    clip_coe = 0.2
+    target_kl = 0.01
 
     # set the seed
     seed = 15
@@ -103,15 +115,6 @@ if __name__ == "__main__":
     print('envs.single_action_space.shape', envs.single_action_space.shape)
     agent = Agent(envs).to(device)
 
-    # hyperparameters
-    gamma = 0.9
-    gae_lambda = 0.95
-    lr = 1e-3
-    ent_coef = 0.0
-    vf_coef = 0.5
-    clip_coe = 0.2
-    target_kl = 0.01
-
     # actor_params = list(agent.actornet.parameters()) + [agent.actor_logstd]
     optimizer = optim.Adam(agent.parameters(), lr=lr)
     # optimizer_critic = optim.Adam(agent.criticnet.parameters(), lr=lr_cr)
@@ -134,8 +137,7 @@ if __name__ == "__main__":
             for step in range(num_steps):
                 global_step += 1 * num_envs
                 acts, logprob, _, value = agent.get_action_and_value(obs)
-                act_np = np.clip(acts.cpu().numpy(), envs.single_action_space.low, envs.single_action_space.high)
-                next_obs, rewards, terminateds, truncateds, infos = envs.step(act_np)
+                next_obs, rewards, terminateds, truncateds, infos = envs.step(acts.cpu().numpy())
                 next_obs = torch.tensor(next_obs, dtype=torch.float32).to(device)
                 done = np.logical_or(terminateds, truncateds)
                 done = torch.tensor(done).to(device)
