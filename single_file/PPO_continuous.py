@@ -17,6 +17,8 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
     def init_env():
         env = gym.make(gym_id, render_mode='rgb_array')
         env = gym.wrappers.RecordEpisodeStatistics(env)
+        env = gym.wrappers.NormalizeObservation(env)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
         if capture_video:
             if idx == 0:
                 env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 200 == 0)
