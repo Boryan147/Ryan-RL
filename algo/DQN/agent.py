@@ -50,7 +50,7 @@ class DQNAgent:
             return None, None
         # randomly select a batch
         batch = self.memory.sample(self.config['batch_size'])
-        # extrach state, action, reward, next_state, done from batch
+        # extract state, action, reward, next_state, done from batch
         state_batch = torch.cat([t.state for t in batch]).to(self.device)
         action_batch = torch.cat([t.action for t in batch]).to(self.device)
         reward_batch = torch.cat([t.reward for t in batch]).to(self.device)
