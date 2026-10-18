@@ -101,15 +101,15 @@ if __name__ == "__main__":
         torch.cuda.manual_seed(seed) 
     torch.backends.cudnn.deterministic = True
 
-    device = torch.device(
-        'cuda' if torch.cuda.is_available() else
-        'mps' if torch.backends.mps.is_available() else
-        'cpu'
-    )
+    device = torch.device('cpu')
     run_name = f"{gym_id}_PPO_seed{seed}__{datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     writer = SummaryWriter(f'runs/{run_name}')
 
-    envs = gym.vector.SyncVectorEnv([make_env(gym_id, seed + i, i, run_name) for i in range(num_envs)])
+    # SAME_STEP: a finished env resets inside the same step(), so no phantom transitions are stored
+    envs = gym.vector.SyncVectorEnv(
+        [make_env(gym_id, seed + i, i, run_name) for i in range(num_envs)],
+        autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
+    )
     assert isinstance(envs.single_action_space, gym.spaces.Box), 'only continuous action space is allowed'
     print('envs.single_observation_space.shape', envs.single_observation_space.shape)
     print('envs.single_action_space.shape', envs.single_action_space.shape)
@@ -152,11 +152,12 @@ if __name__ == "__main__":
                 obs = next_obs
 
                 # log performance metrics
-                if 'episode' in infos:
+                # with SAME_STEP, episode stats of finished envs live in infos['final_info']
+                if 'final_info' in infos:
                     for idx in range(num_envs):
-                        if infos['_episode'][idx]:
-                            writer.add_scalar('charts/episodic reward', infos['episode']['r'][idx], global_step) 
-                            writer.add_scalar('charts/episodic length', infos['episode']['l'][idx], global_step)
+                        if infos['_final_info'][idx]:
+                            writer.add_scalar('charts/episodic reward', infos['final_info']['episode']['r'][idx], global_step)
+                            writer.add_scalar('charts/episodic length', infos['final_info']['episode']['l'][idx], global_step)
 
         with torch.no_grad():
             last_v = agent.criticnet(obs).flatten()
