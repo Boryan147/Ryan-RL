@@ -24,7 +24,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 100 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 200 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -73,7 +73,7 @@ def gae(rewards, values, dones, last_v, gamma, gae_lambda):
 
 if __name__ == "__main__":
     # common arguments
-    gym_id = 'HalfCheetah-v5'
+    gym_id = 'Hopper-v5'
     total_timesteps = 1000000
     num_steps = 2048
     num_envs = 1
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     target_kl = 0.01
 
     # set the seed
-    seed = 15
+    seed = 17
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
