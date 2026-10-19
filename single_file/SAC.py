@@ -17,7 +17,7 @@ def make_env(gym_id, seed, idx, run_name, capture_video=True):
         # no ClipAction: tanh squashing keeps actions in bounds, and ClipAction would widen action_space to (-inf, inf)
         if capture_video:
             if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 200 == 0)
+                env = gym.wrappers.RecordVideo(env, f'videos/{run_name}', episode_trigger=lambda t: t % 50 == 0)
         env.reset(seed=seed)
         return env
     return init_env
@@ -109,7 +109,7 @@ class Actor(nn.Module):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gym-id', type=str, default='HalfCheetah-v5')
-    parser.add_argument('--seed', type=int, default=17)
+    parser.add_argument('--seed', type=int, default=15)
     parser.add_argument('--total-timesteps', type=int, default=300000)
     parser.add_argument('--capture-video', type=int, default=1)
     args = parser.parse_args()
